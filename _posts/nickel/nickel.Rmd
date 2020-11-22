@@ -1,0 +1,246 @@
+---
+title: "Untitled"
+author: "Jonas Brouillon"
+output: 
+  distill::distill_article:
+    self_contained: false
+    
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,message=FALSE,warning = FALSE)
+
+library(osmdata)
+library(tidyverse)
+library(ggplot2)
+library(ggiraph)
+library(sf)
+library(ggthemes)
+options(error=recover)
+q <- opq (getbb ("Nouvelle-Calédonie"))%>% osmdata_sf()
+NC=sf::st_as_sf(q$osm_multipolygons)
+
+NC2=NC%>%
+  filter(name =="Grande-Terre")
+Reserves=sf::read_sf('817aca7c-d588-4ebd-b3e3-d6ca56c722112020330-1-hh60gv.d2ygf.shp')
+Titres_miniers=sf::read_sf('8b4008e9-9ff9-470f-a48c-606e26887e9e2020329-1-9jywlq.wktb5.shp')
+Cadastre=sf::read_sf("b0bc95b5-1ccd-4ce5-844e-8736bf9b41fd2020329-1-azeyoj.54rzp.shp")
+Usines=sf::read_sf("c3765257-70b6-4399-8012-3940f3fc32552020413-1-9knftc.cxc3e.shp")
+Centres_miniers=sf::read_sf("4089d212-8637-4ef9-ab77-365843fb86b02020329-1-1kd0ffl.9fxj.shp")
+Surfaces_geo=sf::read_sf("666fdf46-6e26-4cd8-b9c8-a129a009fabf2020413-1-mfpgaw.o9k6i.shp")
+```
+
+## R Markdown
+
+```{r}
+a=ggplot(NC2)+geom_sf(fill="antiquewhite")+theme_map()+geom_sf_interactive(data=Surfaces_geo%>%filter(lithologie== 'Péridotites'),aes(tooltip=unite,data_id=objectid),fill="#66CDAA")+ theme(panel.background = element_rect(fill = 'aliceblue'))+geom_sf_interactive(data = Usines%>%mutate(etat=str_replace(etat,"Ramp-up","Montée en puissance")),shape=17,size=6,
+                     aes(data_id=objectid,
+                         tooltip=paste(paste("Usine",str_to_lower(procede),"de",societe),paste("Site de",site),paste("Date de production :",date_produ),paste("Etat :",etat) ,sep='\n')))+geom_sf_interactive(data = Centres_miniers,show.legend=FALSE ,aes(color=titulaire,data_id=titulaire,tooltip=paste(paste("Centre minier de",str_to_title(site)),  paste("Massif de",massif),titulaire,sep="\n")),alpha=0.9,size=3)+scale_color_brewer(type='qual',direction = -1) 
+ggiraph(code=print(a), width_svg = 8, height_svg = 6,
+        options = list(
+          opts_hover_inv(css = "opacity:0.3;"),
+          opts_hover(css = "stroke-width:2;")
+        ))
+
+
+```
+
+
+
+```{r 1}
+a=ggplot(NC2)+geom_sf(fill="antiquewhite")+theme_map()+geom_sf_interactive(data=Cadastre,lwd=0.1,aes(tooltip=paste(paste("Groupe :",groupe),paste("Date :",date_insti,'-',date_echea),sep='\n'),data_id=str_replace(groupe,"'"," "),fill=groupe))+ theme(panel.background = element_rect(fill = 'aliceblue'))+scale_fill_few()
+
+
+ggiraph(code=print(a), width_svg = 8, height_svg = 6,
+        options = list(
+          opts_hover_inv(css = "opacity:0.3;"),
+          opts_hover(css = "stroke-width:2;")
+        ))
+```
+
+```{r 2}
+library(viridis)
+a=ggplot(NC2)+geom_sf(fill="antiquewhite")+theme_map()+geom_sf_interactive(data=Cadastre,lwd=0.1,aes(tooltip=paste(paste("Groupe :",groupe),paste("Date :",date_insti,'-',date_echea),sep='\n'),data_id=str_replace(groupe,"'"," "),fill=as.numeric(substr(date_insti,0,4))))+ theme(panel.background = element_rect(fill = 'aliceblue'))+scale_fill_viridis(option="magma")
+
+
+ggiraph(code=print(a), width_svg = 8, height_svg = 6,
+        options = list(
+          opts_hover_inv(css = "opacity:0.3;"),
+          opts_hover(css = "stroke-width:2;")
+        ))
+```
+
+```{r cars}
+####Import export####
+
+Import_Export_ISEE=readxl::read_xls('Import_Export_ISEE.xls',sheet=1)
+
+names <- Import_Export_ISEE[5,]
+
+Export_ISEE=slice(Import_Export_ISEE,31:54)
+colnames(Export_ISEE)=names
+
+Export_ISEE= lapply(Export_ISEE,as.character)%>%as.data.frame()%>%select(-c(20,21))%>%
+  pivot_longer(c(2:19),names_to="Annee",values_to="Exportations")%>%
+  mutate(Exportations=as.numeric(Exportations),Annee=as.numeric(substr(Annee,2,5)))
+
+
+
+i <- 1
+a <- 1999
+
+while (i <= 16)
+{
+
+    Entrees_sorties_ISEE=readxl::read_xls('Entrees_sorties_ISEE.xls',sheet=i)
+
+assign(paste0('Entrees_sorties_', a),Entrees_sorties_ISEE)
+i <- i+1
+a <- a+1
+}
+
+
+
+
+
+###Cours du nickel####
+Cours_Nickel_LME_ISEE=readxl::read_xls('Cours_Nickel_LME_ISEE.xls',sheet=1)
+
+i <- 1
+while (i <= nrow(Cours_Nickel_LME_ISEE)-1){
+  
+  if (is.na(Cours_Nickel_LME_ISEE[i+1,1])==TRUE ){
+    
+    Cours_Nickel_LME_ISEE[i+1,1] = Cours_Nickel_LME_ISEE[i,1]
+  }
+  else{
+    Cours_Nickel_LME_ISEE[i+1,1] = Cours_Nickel_LME_ISEE[i+1,1]
+    
+  }
+  
+  i <- i+1
+}
+
+
+names=Cours_Nickel_LME_ISEE[5,]
+names[,2]='Mois'
+
+Cours_Nickel_LME_ISEE=slice(Cours_Nickel_LME_ISEE,6:nrow(Cours_Nickel_LME_ISEE))
+colnames(Cours_Nickel_LME_ISEE)=names
+
+Cours_Nickel_LME_Annee_ISEE=readxl::read_xls('Cours_Nickel_LME_ISEE.xls',sheet=2)
+
+names=Cours_Nickel_LME_Annee_ISEE[4,]
+colnames(Cours_Nickel_LME_Annee_ISEE)=names
+Cours_Nickel_LME_Annee_ISEE=slice(Cours_Nickel_LME_Annee_ISEE,6:nrow(Cours_Nickel_LME_Annee_ISEE))
+
+Cours_Nickel_LME_Annee_ISEE= lapply(Cours_Nickel_LME_Annee_ISEE,as.character)%>%as.data.frame()%>%
+  pivot_longer(c(2:ncol(Cours_Nickel_LME_Annee_ISEE)),names_to="Annee",values_to="Valeur")%>%
+  mutate(Valeur=as.numeric(Valeur),Annee=as.numeric(substr(Annee,2,5)))
+
+
+
+
+
+###Graphique exportations et cours
+Export_Nickel_ISEE=Export_ISEE%>%
+  filter(str_detect(Données.annuelles,c("nickel","ferronickels"))==TRUE)
+
+
+Export_Nickel_ISEE=Export_Nickel_ISEE%>%
+  mutate(Type="Exportations",Exportations=as.numeric(Exportations))
+         
+Cours_Nickel_LME_Annee_ISEE =Cours_Nickel_LME_Annee_ISEE%>%
+  mutate(Type="Cours du nickel")
+
+a=colnames(Export_Nickel_ISEE)
+colnames(Cours_Nickel_LME_Annee_ISEE)=a
+
+Export_Nickel_Prix=rbind(Cours_Nickel_LME_Annee_ISEE,Export_Nickel_ISEE)
+
+
+
+a=ggplot(Export_Nickel_Prix%>%filter(str_detect(Données.annuelles,"US")==FALSE & is.na(Exportations)==FALSE))+geom_line_interactive(aes(x=Annee,y=Exportations,color=Données.annuelles,tooltip=Données.annuelles,data_id=str_replace(Données.annuelles,"'", " ")),size=1,show.legend=FALSE)+facet_wrap(~Type,scales="free")+theme_clean()+labs(y=" ") +scale_color_brewer(type="qual")+scale_y_log10(labels=function(x){ifelse(x >7000,paste(paste0(format(x,big.mark =" "),"M"), "CFP" )
+                                                                                                                                                                                                                                                                                                                                                                ,paste(format(x,big.mark =" "),"CFP"))})
+  
+girafe(code=print(a), width_svg = 6, height_svg = 3,
+       options = list(
+         opts_hover_inv(css = "opacity:0.5;"),
+         opts_hover(css = "stroke-width:2;")
+       ))
+
+```
+
+
+```{r pressure, echo=FALSE}
+
+
+
+
+
+Emploi_ISEE=lapply(readxl::read_xls('Emploi_ISEE.xls'),as.character )%>%as.data.frame()
+
+i <- 1
+while (i <= ncol(Emploi_ISEE)-1){
+  
+  if (is.na(Emploi_ISEE[4,i+1])==TRUE  ){
+    
+    Emploi_ISEE[4,i+1] = paste(Emploi_ISEE[4,i],Emploi_ISEE[5,i])
+  }
+  else{
+    Emploi_ISEE[4,i+1] = Emploi_ISEE[4,i+1]
+    
+  }
+  
+  i <- i+1
+}
+Emploi_ISEE_2=lapply(readxl::read_xls('Emploi_ISEE.xls',sheet=2),as.character )%>%as.data.frame()
+
+
+
+names <- Emploi_ISEE[4,] 
+
+names[,1]=Emploi_ISEE[15,1]
+colnames(Emploi_ISEE)=names
+`%ni%` <- negate(`%in%`)
+
+Emploi_ISEE=Emploi_ISEE%>%
+  slice(25:47)%>%
+  pivot_longer(3:ncol(Emploi_ISEE),names_to='Trimestre',values_to="Valeur")%>%select(-2)%>%
+  mutate(Trimestre=case_when(substr(Trimestre,6,11)=='T1 T2'~paste("01/06",substr(Trimestre,1,4),sep="/"),
+                              substr(Trimestre,6,14)=='T1 T2 T3'~paste("01/09",substr(Trimestre,1,4),sep="/"),
+                              substr(Trimestre,6,17)=='T1 T2 T3 T4'~paste("01/12",substr(Trimestre,1,4),sep="/"),
+                              TRUE~paste("01/01",substr(Trimestre,1,4),sep="/")),Trimestre=as.Date(Trimestre, format="%d/%m/%Y"))
+
+
+
+
+
+i <- 1
+while (i <= nrow(Emploi_ISEE)){
+  
+  if (Emploi_ISEE[i,1] %ni% c ('Indéterminé (f)','Total') ){
+    
+    Emploi_ISEE[i,1] = str_replace_all(substr(Emploi_ISEE[i,1],4,50),"'",' ')
+  }
+  else{
+    Emploi_ISEE[i,1] =  Emploi_ISEE[i,1]
+    
+  }
+  
+  i <- i+1
+}
+###Graphique emplois NC####
+ library(gghighlight)
+
+a=ggplot(Emploi_ISEE%>%filter(`Emploi salarié du privé par grands secteurs d'activité (d)`!='Total')%>%mutate(label=`Emploi salarié du privé par grands secteurs d'activité (d)`),aes(x=Trimestre,y=as.numeric(Valeur),tooltip=label,data_id=`Emploi salarié du privé par grands secteurs d'activité (d)`,group=`Emploi salarié du privé par grands secteurs d'activité (d)`,colour=`Emploi salarié du privé par grands secteurs d'activité (d)`))+geom_line_interactive(show.legend=FALSE) +scale_x_date()+theme_bw()+gghighlight(max(as.numeric(Valeur),na.rm=TRUE)>3000, use_direct_label = FALSE)+
+  scale_colour_brewer(type='qual') +
+  labs(color='')+scale_y_continuous(labels = scales::label_number(),n.breaks = 10 )
+
+girafe(code=print(a), width_svg = 8, height_svg = 6,
+       options = list(
+         opts_hover_inv(css = "opacity:0.1;"),
+         opts_hover(css = "stroke-width:2;")
+       ))
+```
+
